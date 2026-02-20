@@ -50,16 +50,59 @@ public class SwiftFlutterDocScannerPlugin: NSObject, FlutterPlugin, VNDocumentCa
        return documentsDirectory
    }
 
-   public func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
-       if currentMethod == "getScanDocuments" {
-           saveScannedImages(scan: scan) // Uses existing logic
-       } else if currentMethod == "getScannedDocumentAsImages" {
-           saveScannedImages(scan: scan)
-       } else if currentMethod == "getScannedDocumentAsPdf" {
-           saveScannedPdf(scan: scan)
-       }
-       presentingController?.dismiss(animated: true)
-   }
+   // public func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
+   //     if currentMethod == "getScanDocuments" {
+   //         saveScannedImages(scan: scan) // Uses existing logic
+   //     } else if currentMethod == "getScannedDocumentAsImages" {
+   //         saveScannedImages(scan: scan)
+   //     } else if currentMethod == "getScannedDocumentAsPdf" {
+   //         saveScannedPdf(scan: scan)
+   //     }
+   //     presentingController?.dismiss(animated: true)
+   // }
+
+   public func documentCameraViewController(
+    _ controller: VNDocumentCameraViewController,
+    didFinishWith scan: VNDocumentCameraScan
+) {
+    guard scan.pageCount > 0 else {
+        controller.dismiss(animated: true)
+        resultChannel?(nil)
+        return
+    }
+
+    let firstImage = scan.imageOfPage(at: 0)
+
+    let tempDirPath = getDocumentsDirectory()
+
+    if currentMethod == "getScannedDocumentAsPdf" {
+
+        let fileName = UUID().uuidString + ".pdf"
+        let pdfPath = tempDirPath.appendingPathComponent(fileName)
+
+        let pdfDocument = PDFDocument()
+        if let pdfPage = PDFPage(image: firstImage) {
+            pdfDocument.insert(pdfPage, at: 0)
+        }
+
+        try? pdfDocument.write(to: pdfPath)
+
+        controller.dismiss(animated: true) {
+            self.resultChannel?(pdfPath.path)
+        }
+
+    } else {
+
+        let fileName = UUID().uuidString + ".png"
+        let imagePath = tempDirPath.appendingPathComponent(fileName)
+
+        try? firstImage.pngData()?.write(to: imagePath)
+
+        controller.dismiss(animated: true) {
+            self.resultChannel?([imagePath.path])
+        }
+    }
+}
 
    private func saveScannedImages(scan: VNDocumentCameraScan) {
        let tempDirPath = getDocumentsDirectory()
